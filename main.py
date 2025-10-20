@@ -3,20 +3,20 @@ from PIL import Image, ImageTk
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import os
+import math
 
 
 class ImageProcessor:
     def __init__(self):
         self.root = tk.Tk()
-        self.root.title("Обработка изображений - Вариант 13")
+        self.root.title("Обработка изображений")
         self.root.geometry("1200x900")
 
-        self.image1 = None  # Основное изображение (исходное)
-        self.image1_transformed = None  # Основное изображение после преобразования
-        self.image2 = None  # Второе изображение для наложения
-        self.result_image = None  # Результат наложения
+        self.image1 = None
+        self.image1_transformed = None
+        self.image2 = None
+        self.result_image = None
 
-        # Для отображения в GUI
         self.photo1 = None
         self.photo1_transformed = None
         self.photo2 = None
@@ -25,13 +25,11 @@ class ImageProcessor:
         self.setup_ui()
 
     def setup_ui(self):
-        # Главная рамка
         main_frame = ttk.Frame(self.root, padding="10")
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
 
-        # Панель кнопок управления
         control_frame = ttk.Frame(main_frame)
-        control_frame.grid(row=1, column=0, columnspan=4, pady=10, sticky="ew")
+        control_frame.grid(row=0, column=0, columnspan=4, pady=10, sticky="ew")
 
         ttk.Button(control_frame, text="Загрузить изображение 1",
                    command=self.load_image1).grid(row=0, column=0, padx=5, pady=5, sticky="ew")
@@ -39,46 +37,42 @@ class ImageProcessor:
         ttk.Button(control_frame, text="Загрузить изображение 2",
                    command=self.load_image2).grid(row=0, column=1, padx=5, pady=5, sticky="ew")
 
-        ttk.Button(control_frame, text="Преобразовать (увеличить красный у темных)",
-                   command=self.process_brightness_transformation).grid(row=0, column=2, padx=5, pady=5, sticky="ew")
+        ttk.Button(control_frame, text="Преобразовать (синус тона)",
+                   command=self.process_sine_transformation).grid(row=0, column=2, padx=5, pady=5, sticky="ew")
 
-        ttk.Button(control_frame, text="Наложить (точечный свет)",
-                   command=self.apply_point_light_overlay).grid(row=0, column=3, padx=5, pady=5, sticky="ew")
+        ttk.Button(control_frame, text="Наложить (мягкий свет)",
+                   command=self.apply_soft_light_overlay).grid(row=0, column=3, padx=5, pady=5, sticky="ew")
 
-        ttk.Button(control_frame, text="Сохранить результат преобразования",
-                   command=self.save_transformed).grid(row=1, column=0, columnspan=2, padx=5, pady=5, sticky="ew")
+        ttk.Button(control_frame, text="Сохранить в PPM",
+                   command=self.save_ppm).grid(row=1, column=0, padx=5, pady=5, sticky="ew")
 
-        ttk.Button(control_frame, text="Сохранить результат наложения",
-                   command=self.save_result).grid(row=1, column=2, columnspan=2, padx=5, pady=5, sticky="ew")
+        ttk.Button(control_frame, text="Сохранить в PBM",
+                   command=self.save_pbm).grid(row=1, column=1, padx=5, pady=5, sticky="ew")
 
-        # Конфигурация колонок панели управления
+        ttk.Button(control_frame, text="Сохранить оба формата",
+                   command=self.save_both_formats).grid(row=1, column=2, columnspan=2, padx=5, pady=5, sticky="ew")
+
         for i in range(4):
             control_frame.columnconfigure(i, weight=1)
 
-        # Рамка для отображения изображений
         images_frame = ttk.Frame(main_frame)
-        images_frame.grid(row=2, column=0, columnspan=4, pady=10, sticky="ew")
+        images_frame.grid(row=1, column=0, columnspan=4, pady=10, sticky="ew")
 
-        # Создаем 4 области для изображений
-        self.create_image_display(images_frame, 0, 0, "Исходное изображение 1", "canvas1", "size_label1")
-        self.create_image_display(images_frame, 0, 1, "Результат преобразования", "canvas1_transformed",
-                                  "size_label1_transformed")
-        self.create_image_display(images_frame, 1, 0, "Исходное изображение 2", "canvas2", "size_label2")
-        self.create_image_display(images_frame, 1, 1, "Результат наложения", "canvas_result", "size_label_result")
+        self.create_image_display(images_frame, 0, 0, "Исходное изображение 1", "canvas1")
+        self.create_image_display(images_frame, 0, 1, "Результат преобразования", "canvas1_transformed")
+        self.create_image_display(images_frame, 1, 0, "Исходное изображение 2", "canvas2")
+        self.create_image_display(images_frame, 1, 1, "Результат наложения", "canvas_result")
 
-        # Информационная панель
         info_frame = ttk.Frame(main_frame)
-        info_frame.grid(row=3, column=0, columnspan=4, pady=10, sticky="ew")
+        info_frame.grid(row=2, column=0, columnspan=4, pady=10, sticky="ew")
 
         self.info_label = ttk.Label(info_frame, text="Загрузите изображения для начала работы",
                                     font=('Arial', 10))
         self.info_label.grid(row=0, column=0, pady=10)
 
-        # Прогресс-бар
         self.progress = ttk.Progressbar(info_frame, mode='indeterminate')
         self.progress.grid(row=1, column=0, sticky="ew", pady=5)
 
-        # Конфигурация главной сетки
         main_frame.columnconfigure(0, weight=1)
         main_frame.columnconfigure(1, weight=1)
         main_frame.columnconfigure(2, weight=1)
@@ -89,68 +83,48 @@ class ImageProcessor:
 
         info_frame.columnconfigure(0, weight=1)
 
-    def create_image_display(self, parent, row, col, title, canvas_name, label_name):
-        """Создание области для отображения изображения"""
+    def create_image_display(self, parent, row, col, title, canvas_name):
         frame = ttk.LabelFrame(parent, text=title, padding="5")
         frame.grid(row=row, column=col, padx=5, pady=5, sticky="nsew")
 
-        # Canvas для изображения
         canvas = tk.Canvas(frame, width=280, height=200, bg='white', relief=tk.SUNKEN, bd=2)
         canvas.grid(row=0, column=0, sticky="nsew")
 
-        # Метка для отображения размера изображения
-        size_label = ttk.Label(frame, text="Размер: -", font=('Arial', 9))
-        size_label.grid(row=1, column=0, pady=2)
-        setattr(self, label_name, size_label)
-
-        # Скроллбары
         h_scroll = ttk.Scrollbar(frame, orient=tk.HORIZONTAL, command=canvas.xview)
-        h_scroll.grid(row=2, column=0, sticky="ew")
+        h_scroll.grid(row=1, column=0, sticky="ew")
         canvas.configure(xscrollcommand=h_scroll.set)
 
         v_scroll = ttk.Scrollbar(frame, orient=tk.VERTICAL, command=canvas.yview)
         v_scroll.grid(row=0, column=1, sticky="ns")
         canvas.configure(yscrollcommand=v_scroll.set)
 
-        # Сохраняем ссылку на canvas
         setattr(self, canvas_name, canvas)
 
-        # Конфигурация сетки
         frame.columnconfigure(0, weight=1)
         frame.rowconfigure(0, weight=1)
 
-        # Родительская сетка
         parent.rowconfigure(row, weight=1)
         parent.columnconfigure(col, weight=1)
 
     def numpy_to_photoimage(self, np_array, max_size=(280, 200)):
-        """Преобразование numpy массива в PhotoImage для отображения в tkinter"""
         if np_array is None:
             return None
 
-        # Убеждаемся, что значения в правильном диапазоне
         if np_array.dtype != np.uint8:
             np_array = np.clip(np_array, 0, 255).astype(np.uint8)
 
-        # Создаем PIL изображение
         pil_image = Image.fromarray(np_array)
-
-        # Масштабируем для отображения, сохраняя пропорции
         pil_image.thumbnail(max_size, Image.Resampling.LANCZOS)
-
-        # Преобразуем в PhotoImage
         return ImageTk.PhotoImage(pil_image)
 
-    def update_image_display(self, canvas, photo_image, np_array=None, size_label=None):
-        """Обновление отображения изображения на canvas"""
+    def update_image_display(self, canvas, photo_image, np_array=None):
         canvas.delete("all")
 
         if photo_image is not None:
-            # Центрируем изображение
             canvas_width = canvas.winfo_width()
             canvas_height = canvas.winfo_height()
 
-            if canvas_width <= 1:  # Canvas еще не отрисован
+            if canvas_width <= 1:
                 canvas_width = 280
                 canvas_height = 200
 
@@ -161,16 +135,14 @@ class ImageProcessor:
             y = max(0, (canvas_height - img_height) // 2)
 
             canvas.create_image(x, y, anchor=tk.NW, image=photo_image)
-
-            # Обновляем область прокрутки
             canvas.configure(scrollregion=canvas.bbox("all"))
 
-            # Обновляем информацию о размере
-            if np_array is not None and size_label is not None:
-                size_label.config(text=f"Размер: {np_array.shape[1]}x{np_array.shape[0]}")
+            if np_array is not None:
+                info_text = f"{np_array.shape[1]}x{np_array.shape[0]}"
+                canvas.create_text(10, 10, anchor=tk.NW, text=info_text,
+                                   fill="red", font=('Arial', 9, 'bold'))
 
     def load_image1(self):
-        """Загрузка основного изображения"""
         filename = filedialog.askopenfilename(
             title="Выберите изображение 1",
             filetypes=[
@@ -182,23 +154,20 @@ class ImageProcessor:
         if filename:
             try:
                 self.image1 = self.read_image(filename)
-                self.image1_transformed = None  # Сбрасываем преобразованное изображение
+                self.image1_transformed = None
 
-                # Обновляем отображение
                 self.photo1 = self.numpy_to_photoimage(self.image1)
-                self.update_image_display(self.canvas1, self.photo1, self.image1, self.size_label1)
+                self.update_image_display(self.canvas1, self.photo1, self.image1)
 
-                # Очищаем canvas преобразованного изображения
                 self.canvas1_transformed.delete("all")
                 self.photo1_transformed = None
-                self.size_label1_transformed.config(text="Размер: -")
 
-                self.info_label.config(text=f"Изображение 1 загружено: {os.path.basename(filename)}")
+                self.info_label.config(text=f"Изображение 1 загружено: {os.path.basename(filename)} "
+                                            f"({self.image1.shape[1]}x{self.image1.shape[0]})")
             except Exception as e:
                 messagebox.showerror("Ошибка", f"Не удалось загрузить изображение:\n{str(e)}")
 
     def load_image2(self):
-        """Загрузка второго изображения"""
         filename = filedialog.askopenfilename(
             title="Выберите изображение 2",
             filetypes=[
@@ -211,112 +180,141 @@ class ImageProcessor:
             try:
                 self.image2 = self.read_image(filename)
 
-                # Обновляем отображение
                 self.photo2 = self.numpy_to_photoimage(self.image2)
-                self.update_image_display(self.canvas2, self.photo2, self.image2, self.size_label2)
+                self.update_image_display(self.canvas2, self.photo2, self.image2)
 
-                self.info_label.config(text=f"Изображение 2 загружено: {os.path.basename(filename)}")
+                self.info_label.config(text=f"Изображение 2 загружено: {os.path.basename(filename)} "
+                                            f"({self.image2.shape[1]}x{self.image2.shape[0]})")
             except Exception as e:
                 messagebox.showerror("Ошибка", f"Не удалось загрузить изображение:\n{str(e)}")
 
     def read_image(self, filepath):
-        """Чтение изображения и преобразование в numpy массив RGB"""
         img = Image.open(filepath)
-
-        # Преобразуем в RGB если необходимо
         if img.mode != 'RGB':
             img = img.convert('RGB')
-
         return np.array(img)
 
-    def get_pixel_brightness_simple(self, pixel):
-        """Простое вычисление яркости пикселя (максимальное значение RGB)"""
-        return max(pixel) / 255.0
+    def rgb_to_hsv(self, rgb_array):
+        rgb_normalized = rgb_array.astype(np.float32) / 255.0
+        r, g, b = rgb_normalized[:,:,0], rgb_normalized[:,:,1], rgb_normalized[:,:,2]
+        
+        max_val = np.max(rgb_normalized, axis=2)
+        min_val = np.min(rgb_normalized, axis=2)
+        diff = max_val - min_val
+        
+        h = np.zeros_like(max_val)
+        s = np.zeros_like(max_val)
+        v = max_val
+        
+        # Calculate hue
+        mask = diff != 0
+        r_mask = (max_val == r) & mask
+        g_mask = (max_val == g) & mask
+        b_mask = (max_val == b) & mask
+        
+        h[r_mask] = 60 * ((g[r_mask] - b[r_mask]) / diff[r_mask] % 6)
+        h[g_mask] = 60 * ((b[g_mask] - r[g_mask]) / diff[g_mask] + 2)
+        h[b_mask] = 60 * ((r[b_mask] - g[b_mask]) / diff[b_mask] + 4)
+        
+        # Calculate saturation
+        s[mask] = diff[mask] / max_val[mask]
+        
+        return np.stack([h, s, v], axis=2)
 
-    def increase_red_for_dark_pixels(self, rgb_array, brightness_threshold=0.25):
-        """
-        Увеличение красного компонента у темных пикселей (яркость < 25%)
-        Красный канал увеличивается на 100% (но не более 255)
-        """
-        result = rgb_array.copy().astype(np.float32)
+    def hsv_to_rgb(self, hsv_array):
+        h, s, v = hsv_array[:,:,0], hsv_array[:,:,1], hsv_array[:,:,2]
+        
+        c = v * s
+        x = c * (1 - np.abs((h / 60) % 2 - 1))
+        m = v - c
+        
+        r_prime = np.zeros_like(h)
+        g_prime = np.zeros_like(h)
+        b_prime = np.zeros_like(h)
+        
+        mask = (h >= 0) & (h < 60)
+        r_prime[mask], g_prime[mask], b_prime[mask] = c[mask], x[mask], 0
+        
+        mask = (h >= 60) & (h < 120)
+        r_prime[mask], g_prime[mask], b_prime[mask] = x[mask], c[mask], 0
+        
+        mask = (h >= 120) & (h < 180)
+        r_prime[mask], g_prime[mask], b_prime[mask] = 0, c[mask], x[mask]
+        
+        mask = (h >= 180) & (h < 240)
+        r_prime[mask], g_prime[mask], b_prime[mask] = 0, x[mask], c[mask]
+        
+        mask = (h >= 240) & (h < 300)
+        r_prime[mask], g_prime[mask], b_prime[mask] = x[mask], 0, c[mask]
+        
+        mask = (h >= 300) & (h < 360)
+        r_prime[mask], g_prime[mask], b_prime[mask] = c[mask], 0, x[mask]
+        
+        r = (r_prime + m) * 255
+        g = (g_prime + m) * 255
+        b = (b_prime + m) * 255
+        
+        return np.stack([r, g, b], axis=2).astype(np.uint8)
 
-        # Обрабатываем каждый пиксель
-        for y in range(rgb_array.shape[0]):
-            for x in range(rgb_array.shape[1]):
-                pixel = rgb_array[y, x]
+    def apply_sine_to_saturation(self, rgb_array, frequency=8, amplitude=0.5):
+        hsv = self.rgb_to_hsv(rgb_array)
+        height, width = hsv.shape[:2]
+        
+        for y in range(height):
+            for x in range(width):
+                tone = (x + y) / (width + height) * frequency * 2 * math.pi
+                sine_value = math.sin(tone) * amplitude + 0.5
+                hsv[y, x, 1] = np.clip(sine_value, 0, 1)
+        
+        return self.hsv_to_rgb(hsv)
 
-                # Вычисляем яркость как максимум из RGB компонент
-                brightness = self.get_pixel_brightness_simple(pixel)
-
-                # Если яркость меньше порога, увеличиваем красный канал
-                if brightness < brightness_threshold:
-                    # Увеличиваем красный канал на 100%
-                    new_red = min(pixel[0] * 2, 255)
-                    result[y, x, 0] = new_red
-                    # Зеленый и синий каналы остаются без изменений
-                    result[y, x, 1] = pixel[1]
-                    result[y, x, 2] = pixel[2]
-
-        return result.astype(np.uint8)
-
-    def apply_point_light_blend(self, bottom_layer, top_layer):
-        """
-        Наложение изображений по правилу "точечный свет":
-        - Если яркость пикселя верхнего слоя < 50% - берем минимум по каналам (затемнение)
-        - Иначе - берем максимум по каналам (осветление)
-        """
-        # Приводим изображения к одному размеру
+    def apply_soft_light_blend(self, bottom_layer, top_layer):
         min_height = min(bottom_layer.shape[0], top_layer.shape[0])
         min_width = min(bottom_layer.shape[1], top_layer.shape[1])
 
-        bottom_resized = bottom_layer[:min_height, :min_width]
-        top_resized = top_layer[:min_height, :min_width]
+        bottom_resized = bottom_layer[:min_height, :min_width].astype(np.float32) / 255.0
+        top_resized = top_layer[:min_height, :min_width].astype(np.float32) / 255.0
 
         result = np.zeros_like(bottom_resized)
 
-        # Обрабатываем каждый пиксель
         for y in range(min_height):
             for x in range(min_width):
-                top_pixel = top_resized[y, x]
-                bottom_pixel = bottom_resized[y, x]
-                top_brightness = self.get_pixel_brightness_simple(top_pixel)
+                for c in range(3):
+                    bottom_val = bottom_resized[y, x, c]
+                    top_val = top_resized[y, x, c]
+                    
+                    if top_val <= 0.5:
+                        result_val = bottom_val - (1 - 2 * top_val) * bottom_val * (1 - bottom_val)
+                    else:
+                        result_val = bottom_val + (2 * top_val - 1) * (self.gamma_correction(bottom_val) - bottom_val)
+                    
+                    result[y, x, c] = np.clip(result_val, 0, 1)
 
-                if top_brightness < 0.5:
-                    # Затемнение - берем минимум по каждому каналу
-                    result[y, x] = np.minimum(bottom_pixel, top_pixel)
-                else:
-                    # Осветление - берем максимум по каждому каналу
-                    result[y, x] = np.maximum(bottom_pixel, top_pixel)
+        return (result * 255).astype(np.uint8)
 
-        return result
+    def gamma_correction(self, value, gamma=2.2):
+        return value ** (1/gamma)
 
-    def process_brightness_transformation(self):
-        """Выполнение преобразования основного изображения"""
+    def process_sine_transformation(self):
         if self.image1 is None:
             messagebox.showwarning("Предупреждение", "Сначала загрузите изображение 1")
             return
 
         try:
             self.progress.start()
-
-            # Применяем преобразование
-            self.image1_transformed = self.increase_red_for_dark_pixels(self.image1, 0.25)
-
-            # Обновляем отображение преобразованного изображения
+            self.image1_transformed = self.apply_sine_to_saturation(self.image1)
             self.photo1_transformed = self.numpy_to_photoimage(self.image1_transformed)
-            self.update_image_display(self.canvas1_transformed, self.photo1_transformed,
-                                      self.image1_transformed, self.size_label1_transformed)
+            self.update_image_display(self.canvas1_transformed, self.photo1_transformed, self.image1_transformed)
 
             self.progress.stop()
-            self.info_label.config(text="Преобразование выполнено: красный компонент увеличен у точек с яркостью < 25%")
+            self.info_label.config(text="Преобразование выполнено: синус тона применен к каналу насыщенности")
             messagebox.showinfo("Успех", "Преобразование изображения 1 завершено")
 
         except Exception as e:
             self.progress.stop()
             messagebox.showerror("Ошибка", f"Ошибка при преобразовании:\n{str(e)}")
 
-    def apply_point_light_overlay(self):
-        """Применение наложения по правилу точечного света"""
+    def apply_soft_light_overlay(self):
         if self.image1 is None:
             messagebox.showwarning("Предупреждение", "Сначала загрузите изображение 1")
             return
@@ -327,95 +325,172 @@ class ImageProcessor:
 
         try:
             self.progress.start()
-
-            # Используем преобразованное изображение, если оно есть, иначе исходное
             base_image = self.image1_transformed if self.image1_transformed is not None else self.image1
-
-            # Применяем наложение
-            self.result_image = self.apply_point_light_blend(base_image, self.image2)
-
-            # Обновляем отображение результата
+            self.result_image = self.apply_soft_light_blend(base_image, self.image2)
             self.photo_result = self.numpy_to_photoimage(self.result_image)
-            self.update_image_display(self.canvas_result, self.photo_result,
-                                      self.result_image, self.size_label_result)
+            self.update_image_display(self.canvas_result, self.photo_result, self.result_image)
 
             self.progress.stop()
-            self.info_label.config(text="Наложение по правилу 'точечный свет' выполнено")
-            messagebox.showinfo("Успех", "Наложение изображений по правилу 'точечный свет' завершено")
+            self.info_label.config(text=f"Наложение выполнено. Размер результата: "
+                                        f"{self.result_image.shape[1]}x{self.result_image.shape[0]}")
+            messagebox.showinfo("Успех", "Наложение изображений по правилу 'мягкий свет' завершено")
 
         except Exception as e:
             self.progress.stop()
             messagebox.showerror("Ошибка", f"Ошибка при наложении:\n{str(e)}")
 
-    def save_transformed(self):
-        """Сохранение преобразованного изображения"""
-        if self.image1_transformed is None:
-            messagebox.showwarning("Предупреждение", "Сначала выполните преобразование изображения")
-            return
-
-        filename = filedialog.asksaveasfilename(
-            title="Сохранить преобразованное изображение",
-            defaultextension=".png",
-            filetypes=[
-                ("PNG files", "*.png"),
-                ("JPEG files", "*.jpg"),
-                ("All files", "*.*")
-            ],
-            initialfile="transformed_image.png"
-        )
-
-        if not filename:
-            return
-
-        try:
-            self.save_image(self.image1_transformed, filename)
-            self.info_label.config(text=f"Преобразованное изображение сохранено: {filename}")
-            messagebox.showinfo("Успех", f"Преобразованное изображение сохранено:\n{filename}")
-        except Exception as e:
-            error_msg = f"Ошибка при сохранении файла:\n{str(e)}"
-            self.info_label.config(text="Ошибка сохранения файла")
-            messagebox.showerror("Ошибка", error_msg)
-
-    def save_result(self):
-        """Сохранение результата наложения"""
+    def save_ppm(self):
         if self.result_image is None:
-            messagebox.showwarning("Предупреждение", "Сначала выполните наложение изображений")
+            messagebox.showwarning("Предупреждение",
+                                   "Сначала выполните преобразование и наложение изображений")
             return
 
         filename = filedialog.asksaveasfilename(
-            title="Сохранить результат наложения",
-            defaultextension=".png",
+            title="Сохранить изображение в PPM (P3)",
+            defaultextension=".ppm",
             filetypes=[
-                ("PNG files", "*.png"),
-                ("JPEG files", "*.jpg"),
-                ("All files", "*.*")
+                ("PPM files (*.ppm)", "*.ppm"),
+                ("All files (*.*)", "*.*")
             ],
-            initialfile="result_image.png"
+            initialfile="processed_image.ppm"
         )
 
         if not filename:
             return
 
         try:
-            self.save_image(self.result_image, filename)
-            self.info_label.config(text=f"Результат наложения сохранен: {filename}")
-            messagebox.showinfo("Успех", f"Результат наложения сохранен:\n{filename}")
+            self.progress.start()
+            self.write_ppm_file(filename)
+            self.progress.stop()
+
+            self.info_label.config(text=f"Изображение успешно сохранено в PPM: {filename}")
+            messagebox.showinfo("Успех", f"Изображение сохранено в формате PPM (P3):\n{filename}")
         except Exception as e:
+            self.progress.stop()
             error_msg = f"Ошибка при сохранении файла:\n{str(e)}"
             self.info_label.config(text="Ошибка сохранения файла")
             messagebox.showerror("Ошибка", error_msg)
 
-    def save_image(self, image_array, filename):
-        """Сохранение изображения в файл"""
-        img = Image.fromarray(image_array)
-        img.save(filename)
+    def save_pbm(self):
+        if self.result_image is None:
+            messagebox.showwarning("Предупреждение",
+                                   "Сначала выполните преобразование и наложение изображений")
+            return
+
+        filename = filedialog.asksaveasfilename(
+            title="Сохранить изображение в PBM (P1)",
+            defaultextension=".pbm",
+            filetypes=[
+                ("PBM files (*.pbm)", "*.pbm"),
+                ("All files (*.*)", "*.*")
+            ],
+            initialfile="processed_image.pbm"
+        )
+
+        if not filename:
+            return
+
+        try:
+            self.progress.start()
+            self.write_pbm_file(filename)
+            self.progress.stop()
+
+            self.info_label.config(text=f"Изображение успешно сохранено в PBM: {filename}")
+            messagebox.showinfo("Успех", f"Изображение сохранено в формате PBM (P1):\n{filename}")
+        except Exception as e:
+            self.progress.stop()
+            error_msg = f"Ошибка при сохранении файла:\n{str(e)}"
+            self.info_label.config(text="Ошибка сохранения файла")
+            messagebox.showerror("Ошибка", error_msg)
+
+    def save_both_formats(self):
+        if self.result_image is None:
+            messagebox.showwarning("Предупреждение",
+                                   "Сначала выполните преобразование и наложение изображений")
+            return
+
+        base_filename = filedialog.asksaveasfilename(
+            title="Сохранить изображение в обоих форматах",
+            defaultextension=".ppm",
+            filetypes=[
+                ("PPM files (*.ppm)", "*.ppm"),
+                ("All files (*.*)", "*.*")
+            ],
+            initialfile="processed_image"
+        )
+
+        if not base_filename:
+            return
+
+        try:
+            self.progress.start()
+            base_name = os.path.splitext(base_filename)[0]
+            
+            ppm_filename = base_name + ".ppm"
+            pbm_filename = base_name + ".pbm"
+            
+            self.write_ppm_file(ppm_filename)
+            self.write_pbm_file(pbm_filename)
+            self.progress.stop()
+
+            self.info_label.config(text=f"Изображения сохранены в PPM и PBM форматах")
+            messagebox.showinfo("Успех", f"Изображения сохранены:\nPPM: {ppm_filename}\nPBM: {pbm_filename}")
+        except Exception as e:
+            self.progress.stop()
+            error_msg = f"Ошибка при сохранении файлов:\n{str(e)}"
+            self.info_label.config(text="Ошибка сохранения файлов")
+            messagebox.showerror("Ошибка", error_msg)
+
+    def write_ppm_file(self, filename):
+        if self.result_image is None:
+            raise ValueError("Нет данных изображения для сохранения")
+
+        height, width = self.result_image.shape[:2]
+
+        with open(filename, 'w', encoding='utf-8') as f:
+            f.write("P3\n")
+            f.write("# Обработанное изображение\n")
+            f.write(f"# Размер изображения: {width} x {height}\n")
+            f.write("# Максимальное значение цвета: 255\n")
+            f.write("# Преобразование: синус тона в канале насыщенности\n")
+            f.write("# Наложение: мягкий свет\n")
+            f.write(f"{width} {height}\n")
+            f.write("255\n")
+
+            for y in range(height):
+                row = self.result_image[y]
+                rgb_strings = [f"{int(pixel[0])} {int(pixel[1])} {int(pixel[2])}" for pixel in row]
+                f.write(" ".join(rgb_strings) + "\n")
+
+    def write_pbm_file(self, filename):
+        if self.result_image is None:
+            raise ValueError("Нет данных изображения для сохранения")
+
+        height, width = self.result_image.shape[:2]
+
+        with open(filename, 'w', encoding='utf-8') as f:
+            f.write("P1\n")
+            f.write("# Обработанное изображение\n")
+            f.write(f"# Размер изображения: {width} x {height}\n")
+            f.write("# Преобразование: синус тона в канале насыщенности\n")
+            f.write("# Наложение: мягкий свет\n")
+            f.write(f"{width} {height}\n")
+
+            for y in range(height):
+                row = self.result_image[y]
+                pbm_row = []
+                for pixel in row:
+                    brightness = np.mean(pixel) / 255.0
+                    if brightness > 0.5:
+                        pbm_row.append('0')
+                    else:
+                        pbm_row.append('1')
+                f.write(" ".join(pbm_row) + "\n")
 
     def run(self):
-        """Запуск приложения"""
         self.root.mainloop()
 
 
 if __name__ == "__main__":
     app = ImageProcessor()
     app.run()
-
