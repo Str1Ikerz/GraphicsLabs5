@@ -8,7 +8,7 @@ import os
 class ImageProcessor:
     def __init__(self):
         self.root = tk.Tk()
-        self.root.title("Обработка изображений - Вариант 17")
+        self.root.title("Обработка изображений - Вариант 13")
         self.root.geometry("1200x900")
 
         self.image1 = None  # Основное изображение (исходное)
@@ -28,11 +28,6 @@ class ImageProcessor:
         # Главная рамка
         main_frame = ttk.Frame(self.root, padding="10")
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-
-        # Заголовок
-        title_label = ttk.Label(main_frame, text="Алгоритм обработки изображений - Вариант 17",
-                                font=('Arial', 16, 'bold'))
-        title_label.grid(row=0, column=0, columnspan=4, pady=10)
 
         # Панель кнопок управления
         control_frame = ttk.Frame(main_frame)
@@ -423,3 +418,4 @@ class ImageProcessor:
 if __name__ == "__main__":
     app = ImageProcessor()
     app.run()
+
